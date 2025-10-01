@@ -17,6 +17,9 @@ importers:
       firebase:
         specifier: ^10.12.4
         version: 10.14.1
+      undici:
+        specifier: ^6.19.8
+        version: 6.21.3
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -2991,6 +2994,10 @@ packages:
 
   undici@6.19.7:
     resolution: {integrity: sha512-HR3W/bMGPSr90i8AAp2C4DM3wChFdJPLrWYpIS++LxS8K+W535qftjt+4MyjNYHeWabMj1nvtmLIi7l++iq91A==}
+    engines: {node: '>=18.17'}
+
+  undici@6.21.3:
+    resolution: {integrity: sha512-gBLkYIlEnSp8pFbT64yFgGE6UIB9tAkhukC23PmMDCe5Nd+cRqKxSjw5y54MK2AZMgZfJWMaNE4nYUHgi1XEOw==}
     engines: {node: '>=18.17'}
 
   unpipe@1.0.0:
@@ -6091,6 +6098,8 @@ snapshots:
   undici-types@7.10.0: {}
 
   undici@6.19.7: {}
+
+  undici@6.21.3: {}
 
   unpipe@1.0.0: {}
 
