@@ -184,47 +184,29 @@ export default function AnimePage() {
 
             <h2 className="mb-3 text-lg font-semibold">Episodes</h2>
 
-            <div className="mb-4 flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">Season</label>
-                <div className="relative inline-block">
-                  <select
-                    value={selectedId ?? undefined}
-                    onChange={(e) => setSelectedId(Number(e.target.value))}
-                    className="appearance-none rounded-md border bg-background px-4 py-2 pr-8 text-sm transition-shadow duration-150 hover:shadow-sm focus:shadow-md focus:outline-none"
-                    aria-label="Select season"
-                  >
-                    {seasons.length > 0 ? (
-                      seasons.map((s, i) => (
-                        <option
-                          key={s.id}
-                          value={s.id}
-                        >{`Season ${i + 1}`}</option>
-                      ))
-                    ) : (
-                      <option value={selectedId ?? id}>Season 1</option>
-                    )}
-                  </select>
-                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      className="text-foreground/70"
-                    >
-                      <path
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 9l6 6 6-6"
-                      />
-                    </svg>
-                  </span>
-                </div>
+            {info?.type !== "MOVIE" && (
+              <div className="mb-4 flex items-center gap-3 overflow-x-auto pb-1">
+                {seasons.length > 0 ? (
+                  seasons.map((s, i) => {
+                    const active = s.id === (selectedId ?? id);
+                    return (
+                      <button
+                        key={s.id}
+                        className={`whitespace-nowrap rounded-full border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+                        onClick={() => setSelectedId(s.id)}
+                        aria-pressed={active}
+                      >
+                        {`Season ${i + 1}`}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <button className="rounded-full border px-3 py-1 text-sm" disabled>
+                    Season 1
+                  </button>
+                )}
               </div>
-            </div>
+            )}
 
             {loadingEpisodes ? (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
