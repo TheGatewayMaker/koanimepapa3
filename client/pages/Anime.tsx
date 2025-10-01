@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
-import {
-  fetchAnimeInfo,
-  fetchEpisodes,
-  ApiAnimeSummary,
-  EpisodeItem,
-  fetchStreams,
-  StreamLink,
-} from "../lib/anime";
+import { fetchAnimeInfo, fetchEpisodes, ApiAnimeSummary, EpisodeItem } from "../lib/anime";
 import { toast } from "sonner";
 
 export default function AnimePage() {
@@ -18,7 +11,6 @@ export default function AnimePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [episodes, setEpisodes] = useState<EpisodeItem[]>([]);
   const [episodesPagination, setEpisodesPagination] = useState<any>(null);
-  const [streams, setStreams] = useState<StreamLink[]>([]);
   const [loadingInfo, setLoadingInfo] = useState(true);
   const [loadingEpisodes, setLoadingEpisodes] = useState(true);
 
@@ -33,14 +25,11 @@ export default function AnimePage() {
           });
           setInfo(null);
           setSelectedId(id);
-          setStreams([]);
         } else {
           setInfo(i);
           const baseSeason =
             i.seasons && i.seasons.length > 0 ? i.seasons[0].id : id;
           setSelectedId(baseSeason);
-          const s = await fetchStreams(baseSeason, 1).catch(() => []);
-          setStreams(s || []);
         }
       } catch (e) {
         console.error(e);
@@ -49,7 +38,6 @@ export default function AnimePage() {
         });
         setInfo(null);
         setSelectedId(id);
-        setStreams([]);
       } finally {
         setLoadingInfo(false);
       }
@@ -163,24 +151,6 @@ export default function AnimePage() {
           )}
 
           <div className="container mx-auto px-4 pb-10">
-            {streams.length > 0 && (
-              <div className="mb-8">
-                <h2 className="mb-3 text-lg font-semibold">Where to watch</h2>
-                <div className="flex flex-wrap gap-2">
-                  {streams.map((s) => (
-                    <a
-                      key={s.url}
-                      href={s.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center rounded-md border px-3 py-2 text-sm hover:bg-accent"
-                    >
-                      {s.name}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <h2 className="mb-3 text-lg font-semibold">Episodes</h2>
 
@@ -223,26 +193,12 @@ export default function AnimePage() {
                   <button
                     key={ep.id + "-" + ep.number}
                     className="rounded border px-3 py-2 text-left text-sm hover:bg-accent"
-                    onClick={async () => {
-                      try {
-                        const src = await fetchStreams(selectedId ?? id, ep.number);
-                        if (src && src.length > 0) {
-                          window.open(src[0].url, "_blank", "noreferrer");
-                        } else if (streams.length > 0) {
-                          window.open(streams[0].url, "_blank", "noreferrer");
-                        } else {
-                          toast("Streaming not available", {
-                            description: "No sources were found for this episode.",
-                            duration: 2500,
-                          });
-                        }
-                      } catch (e) {
-                        toast("Streaming error", {
-                          description: "Failed to load sources for this episode.",
-                          duration: 2500,
-                        });
-                      }
-                    }}
+                    onClick={() =>
+                      toast("Streaming links unavailable", {
+                        description: "Where to watch will be added later.",
+                        duration: 2500,
+                      })
+                    }
                   >
                     <div className="font-medium">Episode {ep.number}</div>
                     {ep.title && (
