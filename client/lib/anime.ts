@@ -63,7 +63,7 @@ export async function fetchDiscover(
     if (params.page) qs.set("page", String(params.page));
     if (params.order_by) qs.set("order_by", params.order_by);
     if (params.sort) qs.set("sort", params.sort);
-    const res = await fetch(`/api/anime/discover?${qs.toString()}`);
+    const res = await fetchWithTimeout(`/api/anime/discover?${qs.toString()}`);
     if (!res.ok) {
       console.error(
         "fetchDiscover failed",
@@ -99,7 +99,7 @@ export interface GenreItem {
 }
 export async function fetchGenres(): Promise<GenreItem[]> {
   try {
-    const res = await fetch("/api/anime/genres");
+    const res = await fetchWithTimeout("/api/anime/genres");
     if (!res.ok) {
       console.error(
         "fetchGenres failed",
@@ -122,7 +122,7 @@ export interface StreamLink {
 }
 export async function fetchStreams(id: number): Promise<StreamLink[]> {
   try {
-    const res = await fetch(`/api/anime/streams/${id}`);
+    const res = await fetchWithTimeout(`/api/anime/streams/${id}`);
     if (!res.ok) {
       console.error(
         "fetchStreams failed",
@@ -141,7 +141,7 @@ export async function fetchStreams(id: number): Promise<StreamLink[]> {
 
 export async function fetchNewReleases(): Promise<ApiAnimeSummary[]> {
   try {
-    const res = await fetch("/api/anime/new");
+    const res = await fetchWithTimeout("/api/anime/new");
     if (!res.ok) {
       console.error(
         "fetchNewReleases failed",
@@ -162,7 +162,7 @@ export async function fetchAnimeInfo(
   id: number,
 ): Promise<ApiAnimeSummary | null> {
   try {
-    const res = await fetch(`/api/anime/info/${id}`);
+    const res = await fetchWithTimeout(`/api/anime/info/${id}`);
     if (!res.ok) {
       console.error(
         "fetchAnimeInfo failed",
@@ -197,7 +197,7 @@ export async function fetchEpisodes(
   page = 1,
 ): Promise<EpisodesResponse> {
   try {
-    const res = await fetch(`/api/anime/episodes/${id}?page=${page}`);
+    const res = await fetchWithTimeout(`/api/anime/episodes/${id}?page=${page}`);
     if (res.ok) {
       const data = await res.json();
       return normalizeEpisodesResponse(data);
