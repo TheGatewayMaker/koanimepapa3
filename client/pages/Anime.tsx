@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
-import { fetchAnimeInfo, fetchEpisodes, ApiAnimeSummary, EpisodeItem } from "../lib/anime";
+import {
+  fetchAnimeInfo,
+  fetchEpisodes,
+  ApiAnimeSummary,
+  EpisodeItem,
+} from "../lib/anime";
 import { toast } from "sonner";
 
 export default function AnimePage() {
@@ -151,7 +156,6 @@ export default function AnimePage() {
           )}
 
           <div className="container mx-auto px-4 pb-10">
-
             <h2 className="mb-3 text-lg font-semibold">Episodes</h2>
 
             {info?.type !== "MOVIE" && (
@@ -171,7 +175,10 @@ export default function AnimePage() {
                     );
                   })
                 ) : (
-                  <button className="rounded-full border px-3 py-1 text-sm" disabled>
+                  <button
+                    className="rounded-full border px-3 py-1 text-sm"
+                    disabled
+                  >
                     Season 1
                   </button>
                 )}

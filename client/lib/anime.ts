@@ -12,7 +12,11 @@ export interface ApiAnimeSummary {
   isNewSeason?: boolean;
 }
 
-function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 10000) {
+function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = 10000,
+) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const merged = { ...init, signal: controller.signal } as RequestInit;
@@ -120,12 +124,18 @@ export interface StreamLink {
   name: string;
   url: string;
 }
-export async function fetchStreams(id: number, ep?: number, sub: "sub" | "dub" = "sub"): Promise<StreamLink[]> {
+export async function fetchStreams(
+  id: number,
+  ep?: number,
+  sub: "sub" | "dub" = "sub",
+): Promise<StreamLink[]> {
   try {
     const qs = new URLSearchParams();
     if (ep) qs.set("ep", String(ep));
     if (sub) qs.set("sub", sub);
-    const res = await fetchWithTimeout(`/api/anime/streams/${id}?${qs.toString()}`);
+    const res = await fetchWithTimeout(
+      `/api/anime/streams/${id}?${qs.toString()}`,
+    );
     if (!res.ok) {
       console.error(
         "fetchStreams failed",
@@ -200,7 +210,11 @@ export async function fetchEpisodes(
   page = 1,
 ): Promise<EpisodesResponse> {
   try {
-    const res = await fetchWithTimeout(`/api/anime/episodes/${id}?page=${page}`, {}, 12000);
+    const res = await fetchWithTimeout(
+      `/api/anime/episodes/${id}?page=${page}`,
+      {},
+      12000,
+    );
     if (res.ok) {
       const data = await res.json();
       return normalizeEpisodesResponse(data);

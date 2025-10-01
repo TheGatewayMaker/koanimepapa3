@@ -32,13 +32,24 @@ async function fetchJson(url: string, timeoutMs = 10000) {
 function mapJikanAnimeToSummary(a: any) {
   const id = a?.mal_id ?? a?.id ?? null;
   const title =
-    a?.title_english || a?.title || (Array.isArray(a?.titles) ? a.titles[0]?.title : "") || "";
-  const image = a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url || a?.image_url || "";
+    a?.title_english ||
+    a?.title ||
+    (Array.isArray(a?.titles) ? a.titles[0]?.title : "") ||
+    "";
+  const image =
+    a?.images?.jpg?.large_image_url ||
+    a?.images?.jpg?.image_url ||
+    a?.image_url ||
+    "";
   const type = a?.type || undefined;
-  const year = a?.year ?? (a?.aired?.from ? new Date(a.aired.from).getUTCFullYear() : null);
+  const year =
+    a?.year ??
+    (a?.aired?.from ? new Date(a.aired.from).getUTCFullYear() : null);
   const rating = typeof a?.score === "number" ? a.score : null;
   const synopsis = typeof a?.synopsis === "string" ? a.synopsis : "";
-  const genres = Array.isArray(a?.genres) ? a.genres.map((g: any) => g?.name).filter(Boolean) : [];
+  const genres = Array.isArray(a?.genres)
+    ? a.genres.map((g: any) => g?.name).filter(Boolean)
+    : [];
   return { id, title, image, type, year, rating, synopsis, genres };
 }
 
@@ -80,7 +91,10 @@ export const getSearch: RequestHandler = async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
     if (!q) return res.json({ results: [] });
-    const j = await fetchJson(`${JIKAN_BASE}/anime?q=${encodeURIComponent(q)}&limit=20&sfw`, 12000);
+    const j = await fetchJson(
+      `${JIKAN_BASE}/anime?q=${encodeURIComponent(q)}&limit=20&sfw`,
+      12000,
+    );
     const results = ((j?.data as any[]) || []).map((a: any) => ({
       mal_id: a?.mal_id,
       title: a?.title_english || a?.title,
@@ -159,7 +173,11 @@ export const getInfo: RequestHandler = async (req, res) => {
     const chain = [...back.reverse(), a, ...fwd];
     const seasons = chain
       .filter((n) => n && n.type !== "Movie")
-      .map((n, idx) => ({ id: n.mal_id, number: idx + 1, title: n?.title_english || n?.title }));
+      .map((n, idx) => ({
+        id: n.mal_id,
+        number: idx + 1,
+        title: n?.title_english || n?.title,
+      }));
 
     res.json({ ...base, seasons });
   } catch (e: any) {
@@ -172,17 +190,28 @@ export const getEpisodes: RequestHandler = async (req, res) => {
     const id = String(req.params.id || "").trim();
     const page = Math.max(1, Number(req.query.page || 1) || 1);
     if (!/^\d+$/.test(id)) return res.json({ episodes: [], pagination: null });
-    const j = await fetchJson(`${JIKAN_BASE}/anime/${id}/episodes?page=${page}`, 12000);
+    const j = await fetchJson(
+      `${JIKAN_BASE}/anime/${id}/episodes?page=${page}`,
+      12000,
+    );
     const items: any[] = (j?.data as any[]) || [];
     const episodes = items.map((ep: any, idx: number) => ({
       id: String(ep?.mal_id ?? `${id}-${(page - 1) * 100 + idx + 1}`),
-      number: typeof ep?.mal_id === "number" ? ep.mal_id : ep?.episode ?? ep?.number ?? idx + 1,
+      number:
+        typeof ep?.mal_id === "number"
+          ? ep.mal_id
+          : (ep?.episode ?? ep?.number ?? idx + 1),
       title: ep?.title || ep?.title_romanji || ep?.title_ja || undefined,
       air_date: ep?.aired || null,
     }));
     const pagination = j?.pagination || null;
     const last = pagination?.last_visible_page ?? pagination?.last_page ?? null;
-    res.json({ episodes, pagination: pagination ? { ...pagination, last_visible_page: last } : null });
+    res.json({
+      episodes,
+      pagination: pagination
+        ? { ...pagination, last_visible_page: last }
+        : null,
+    });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Episodes failed" });
   }
@@ -274,6 +303,8 @@ export const getNewReleases: RequestHandler = async (_req, res) => {
     const results = ((j?.data as any[]) || []).map(mapJikanAnimeToSummary);
     res.json({ results });
   } catch (e: any) {
-    res.status(500).json({ error: e?.message || "Failed to fetch new releases" });
+    res
+      .status(500)
+      .json({ error: e?.message || "Failed to fetch new releases" });
   }
 };
