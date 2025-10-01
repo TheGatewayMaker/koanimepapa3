@@ -12,9 +12,16 @@ export interface ApiAnimeSummary {
   isNewSeason?: boolean;
 }
 
+function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const merged = { ...init, signal: controller.signal } as RequestInit;
+  return fetch(input, merged).finally(() => clearTimeout(timer));
+}
+
 export async function fetchTrending(): Promise<ApiAnimeSummary[]> {
   try {
-    const res = await fetch("/api/anime/trending");
+    const res = await fetchWithTimeout("/api/anime/trending");
     if (!res.ok) {
       console.error(
         "fetchTrending failed",
