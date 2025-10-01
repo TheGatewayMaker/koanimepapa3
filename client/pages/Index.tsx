@@ -77,16 +77,32 @@ export default function Index() {
           <h3 className="mb-3 text-base font-semibold md:text-lg">
             Browse by Genre
           </h3>
-          <div className="flex flex-wrap gap-2">
-            {GENRES.map((g) => (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {GENRES.slice(0, 10).map((g) => (
               <a
                 key={g}
                 href={`/discover?genre=${encodeURIComponent(g)}`}
-                className="rounded-full border px-3 py-1 text-sm hover:bg-accent"
+                className="whitespace-nowrap rounded-full border px-3 py-1 text-sm hover:bg-accent"
               >
                 {g}
               </a>
             ))}
+            <details className="relative">
+              <summary className="list-none cursor-pointer rounded-full border px-3 py-1 text-sm hover:bg-accent">
+                More
+              </summary>
+              <div className="absolute z-10 mt-2 max-h-64 w-56 overflow-auto rounded-md border bg-background p-2 shadow-md">
+                {GENRES.map((g) => (
+                  <a
+                    key={g}
+                    href={`/discover?genre=${encodeURIComponent(g)}`}
+                    className="block rounded px-2 py-1 text-sm hover:bg-accent"
+                  >
+                    {g}
+                  </a>
+                ))}
+              </div>
+            </details>
           </div>
         </div>
       </section>
