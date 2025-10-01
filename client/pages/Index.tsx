@@ -117,7 +117,8 @@ export default function Index() {
               if (!r.ok) return b;
               const info = await r.json();
               const desc = truncateText(info?.synopsis || "");
-              return { ...b, description: desc } as BannerItem;
+              const img = info?.image || b.image;
+              return { ...b, description: desc, image: img } as BannerItem;
             } catch {
               return b;
             }
