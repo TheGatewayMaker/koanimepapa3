@@ -15,6 +15,8 @@ function setCached(key: string, data: any) {
   cache[key] = { at: Date.now(), data };
 }
 
+import { safeFetch } from "../utils/safe-fetch";
+
 async function gql<T>(
   query: string,
   variables: Record<string, any>,
@@ -23,7 +25,7 @@ async function gql<T>(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(ANILIST_GQL, {
+    const res = await safeFetch(ANILIST_GQL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, variables }),

@@ -15,11 +15,13 @@ function setCached(key: string, data: any) {
   cache[key] = { at: Date.now(), data };
 }
 
+import { safeFetch } from "../utils/safe-fetch";
+
 async function fetchJson(url: string, timeoutMs = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { signal: controller.signal });
+    const r = await safeFetch(url, { signal: controller.signal });
     if (!r.ok) return null;
     return await r.json();
   } catch {
