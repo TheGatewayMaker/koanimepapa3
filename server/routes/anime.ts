@@ -301,7 +301,20 @@ export const getInfo: RequestHandler = async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
 
-    const base = mapJikanAnimeToSummary(a);
+    let base = mapJikanAnimeToSummary(a);
+
+    // Prefer AniList extraLarge cover image when available for higher quality banner use
+    try {
+      const al = await gql<any>(
+        `query($idMal:Int!){ Media(idMal:$idMal, type:ANIME){ coverImage{ extraLarge large } } }`,
+        { idMal: Number(id) },
+      );
+      const alImg =
+        al?.Media?.coverImage?.extraLarge || al?.Media?.coverImage?.large || "";
+      if (alImg) base = { ...base, image: alImg };
+    } catch {
+      // ignore optional enrichment errors
+    }
 
     // Build seasons chain using relations (prequel/sequel). Limit depth for perf.
     const seen = new Set<number>([Number(id)]);
