@@ -1,6 +1,9 @@
 import { RequestHandler } from "express";
+import { safeFetch } from "../utils/safe-fetch";
 
 const JIKAN_BASE = "https://api.jikan.moe/v4";
+const ANIMEDEX_BASE = "https://api3.anime-dexter-live.workers.dev";
+const ANILIST_GQL = "https://graphql.anilist.co";
 
 // Simple in-memory cache with TTL
 const TTL_MS = 5 * 60 * 1000;
@@ -15,8 +18,6 @@ function setCached(key: string, data: any) {
   cache[key] = { at: Date.now(), data };
 }
 
-import { safeFetch } from "../utils/safe-fetch";
-
 async function fetchJson(url: string, timeoutMs = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -24,6 +25,49 @@ async function fetchJson(url: string, timeoutMs = 10000) {
     const r = await safeFetch(url, { signal: controller.signal });
     if (!r.ok) return null;
     return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchDex(path: string, timeoutMs = 12000) {
+  const url = `${ANIMEDEX_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const r = await safeFetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+      },
+      signal: controller.signal,
+    });
+    if (!r.ok) return null;
+    return await r.json().catch(() => null);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function gql<T>(query: string, variables: Record<string, any>, timeoutMs = 12000): Promise<T | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await safeFetch(ANILIST_GQL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    if (j?.errors) return null;
+    return j?.data as T;
   } catch {
     return null;
   } finally {
@@ -55,6 +99,36 @@ function mapJikanAnimeToSummary(a: any) {
   return { id, title, image, type, year, rating, synopsis, genres };
 }
 
+function mapDexAnimeToSummary(a: any) {
+  // Best-effort tolerant mapper for AnimeDex responses
+  const id =
+    a?.id ?? a?.animeId ?? a?.mal_id ?? a?.slug ?? a?.gogo_id ?? a?.animeIdV2;
+  const title = a?.title ?? a?.name ?? a?.animeTitle ?? a?.title_english ?? "";
+  const image =
+    a?.image ?? a?.img ?? a?.poster ?? a?.cover ?? a?.picture ?? a?.thumbnail ?? "";
+  const type = a?.type ?? a?.format ?? undefined;
+  const yearRaw = a?.year ?? a?.releaseDate ?? a?.released ?? a?.airedFrom ?? null;
+  const year =
+    typeof yearRaw === "number"
+      ? yearRaw
+      : typeof yearRaw === "string"
+        ? Number((yearRaw.match(/\d{4}/) || [])[0]) || null
+        : null;
+  const ratingRaw = a?.rating ?? a?.score ?? a?.averageScore ?? null;
+  const rating =
+    typeof ratingRaw === "number"
+      ? ratingRaw
+      : typeof ratingRaw === "string"
+        ? Number(ratingRaw)
+        : null;
+  const synopsis =
+    (a?.synopsis || a?.description || a?.overview || a?.plot || "").toString();
+  const genres = Array.isArray(a?.genres)
+    ? a.genres.map((g: any) => (typeof g === "string" ? g : g?.name)).filter(Boolean)
+    : [];
+  return { id, title, image, type, year, rating, synopsis, genres };
+}
+
 // Genres mapping cache (name -> id)
 let genreMapCache: { at: number; byName: Record<string, number> } | null = null;
 async function getGenreIdByName(name: string): Promise<number | null> {
@@ -82,9 +156,25 @@ export const getTrending: RequestHandler = async (_req, res) => {
       j = await fetchJson(`${JIKAN_BASE}/top/anime?limit=24&sfw`, 12000);
       if (j) setCached(key, j);
     }
-    const results = ((j?.data as any[]) || []).map(mapJikanAnimeToSummary);
+    let results = ((j?.data as any[]) || []).map(mapJikanAnimeToSummary);
+
+    if (!results.length) {
+      const dj = await fetchDex("/gogoPopular/1");
+      const arr: any[] = Array.isArray(dj)
+        ? dj
+        : dj?.results || dj?.data || dj?.items || dj?.animes || [];
+      results = arr.map(mapDexAnimeToSummary).slice(0, 24);
+    }
+
     res.json({ results });
   } catch (e: any) {
+    // Final fallback attempt
+    const dj = await fetchDex("/gogoPopular/1");
+    const arr: any[] = Array.isArray(dj)
+      ? dj
+      : dj?.results || dj?.data || dj?.items || dj?.animes || [];
+    const results = arr.map(mapDexAnimeToSummary).slice(0, 24);
+    if (results.length) return res.json({ results });
     res.status(500).json({ error: e?.message || "Failed to fetch trending" });
   }
 };
@@ -98,7 +188,6 @@ export const getSearch: RequestHandler = async (req, res) => {
     const j = await fetchJson(url, 12000);
     const raw: any[] = (j?.data as any[]) || [];
 
-    // Basic fuzzy scoring against multiple title variants
     const norm = (s: string) => s.toLowerCase();
     const tokens = norm(q).split(/\s+/).filter(Boolean);
     function score(item: any): number {
@@ -111,10 +200,9 @@ export const getSearch: RequestHandler = async (req, res) => {
       let s = 0;
       for (const t of tokens) {
         if (!t) continue;
-        if (hay.includes(t)) s += 5; // substring match
-        if (hay.startsWith(t)) s += 2; // prefix
+        if (hay.includes(t)) s += 5;
+        if (hay.startsWith(t)) s += 2;
       }
-      // Boost by popularity proxies if available
       if (typeof item?.members === "number")
         s += Math.min(10, Math.floor(item.members / 100000));
       if (typeof item?.favorites === "number")
@@ -122,7 +210,7 @@ export const getSearch: RequestHandler = async (req, res) => {
       return s;
     }
 
-    const ranked = raw
+    let ranked = raw
       .map((a) => ({ a, s: score(a) }))
       .sort((x, y) => y.s - x.s)
       .slice(0, 20)
@@ -134,8 +222,46 @@ export const getSearch: RequestHandler = async (req, res) => {
         year: a?.year ?? null,
       }));
 
+    if (!ranked.length) {
+      const dj = await fetchDex(`/search/${encodeURIComponent(q)}`);
+      const arr: any[] = Array.isArray(dj)
+        ? dj
+        : dj?.results || dj?.data || dj?.items || dj?.animes || [];
+      ranked = arr.slice(0, 20).map((a: any) => ({
+        mal_id: a?.mal_id ?? a?.id ?? a?.animeId ?? null,
+        title: a?.title ?? a?.name ?? a?.animeTitle ?? "",
+        image_url: a?.image ?? a?.img ?? a?.poster ?? "",
+        type: a?.type ?? a?.format ?? undefined,
+        year:
+          typeof a?.year === "number"
+            ? a.year
+            : typeof a?.releaseDate === "string"
+              ? Number((a.releaseDate.match(/\d{4}/) || [])[0]) || null
+              : null,
+      }));
+    }
+
     res.json({ results: ranked });
   } catch (e: any) {
+    // Fallback
+    const q = String(req.query.q || "").trim();
+    const dj = q ? await fetchDex(`/search/${encodeURIComponent(q)}`) : null;
+    const arr: any[] = Array.isArray(dj)
+      ? dj
+      : dj?.results || dj?.data || dj?.items || dj?.animes || [];
+    const ranked = arr.slice(0, 20).map((a: any) => ({
+      mal_id: a?.mal_id ?? a?.id ?? a?.animeId ?? null,
+      title: a?.title ?? a?.name ?? a?.animeTitle ?? "",
+      image_url: a?.image ?? a?.img ?? a?.poster ?? "",
+      type: a?.type ?? a?.format ?? undefined,
+      year:
+        typeof a?.year === "number"
+          ? a.year
+          : typeof a?.releaseDate === "string"
+            ? Number((a.releaseDate.match(/\d{4}/) || [])[0]) || null
+            : null,
+    }));
+    if (ranked.length) return res.json({ results: ranked });
     res.status(500).json({ error: e?.message || "Search failed" });
   }
 };
@@ -147,7 +273,33 @@ export const getInfo: RequestHandler = async (req, res) => {
 
     const j = await fetchJson(`${JIKAN_BASE}/anime/${id}/full`, 12000);
     const a = j?.data;
-    if (!a) return res.status(404).json({ error: "Not found" });
+    if (!a) {
+      // Try AniList by MAL id
+      const al = await gql<any>(
+        `query($idMal:Int!){ Media(idMal:$idMal, type:ANIME){ id title{ romaji english native } coverImage{ large extraLarge } seasonYear averageScore format genres description(asHtml:false) } }`,
+        { idMal: Number(id) },
+      );
+      const m = al?.Media;
+      if (m) {
+        const title = (m?.title?.english || m?.title?.romaji || m?.title?.native || "").toString();
+        const info = {
+          ...mapDexAnimeToSummary({
+            id: Number(id),
+            title,
+            image: m?.coverImage?.extraLarge || m?.coverImage?.large || "",
+            year: m?.seasonYear ?? null,
+            rating: typeof m?.averageScore === "number" ? Math.round(m.averageScore / 10) : null,
+            format: m?.format,
+            genres: m?.genres || [],
+            description: (m?.description || "").toString(),
+          }),
+          seasons: [] as any[],
+        };
+        return res.json(info);
+      }
+      // Try AnimeDex search by title obtained from AniList (if any failed above then no info)
+      return res.status(404).json({ error: "Not found" });
+    }
 
     const base = mapJikanAnimeToSummary(a);
 
@@ -171,12 +323,10 @@ export const getInfo: RequestHandler = async (req, res) => {
       const nodes = list
         .filter((r: any) => (r?.relation || "").toLowerCase() === type)
         .flatMap((r: any) => (Array.isArray(r?.entry) ? r.entry : []));
-      // Prefer TV/ONA
       const tv = nodes.find((n: any) => n?.type === "TV" || n?.type === "ONA");
       return tv || nodes[0] || null;
     }
 
-    // backward
     let cur = a;
     for (let i = 0; i < 3; i++) {
       const prev = pick(cur?.relations, "prequel");
@@ -189,7 +339,6 @@ export const getInfo: RequestHandler = async (req, res) => {
       cur = full;
     }
 
-    // forward
     cur = a;
     for (let i = 0; i < 3; i++) {
       const next = pick(cur?.relations, "sequel");
@@ -227,7 +376,7 @@ export const getEpisodes: RequestHandler = async (req, res) => {
       12000,
     );
     const items: any[] = (j?.data as any[]) || [];
-    const episodes = items.map((ep: any, idx: number) => ({
+    let episodes = items.map((ep: any, idx: number) => ({
       id: String(ep?.mal_id ?? `${id}-${(page - 1) * 100 + idx + 1}`),
       number:
         typeof ep?.mal_id === "number"
@@ -238,14 +387,49 @@ export const getEpisodes: RequestHandler = async (req, res) => {
     }));
     const pagination = j?.pagination || null;
     const last = pagination?.last_visible_page ?? pagination?.last_page ?? null;
-    res.json({
+
+    if (!episodes.length) {
+      // Fallback path: get title via AniList idMal, then use AnimeDex search -> anime -> episodes
+      const al = await gql<any>(
+        `query($idMal:Int!){ Media(idMal:$idMal, type:ANIME){ id title{ romaji english native } } }`,
+        { idMal: Number(id) },
+      );
+      const title =
+        al?.Media?.title?.english || al?.Media?.title?.romaji || al?.Media?.title?.native || "";
+      if (title) {
+        const djSearch = await fetchDex(`/search/${encodeURIComponent(title)}`);
+        const arr: any[] = Array.isArray(djSearch)
+          ? djSearch
+          : djSearch?.results || djSearch?.data || djSearch?.items || djSearch?.animes || [];
+        const cand = arr[0];
+        const dexId = cand?.id ?? cand?.animeId ?? cand?.slug ?? null;
+        if (dexId) {
+          const djInfo = await fetchDex(`/anime/${encodeURIComponent(String(dexId))}`);
+          const epsArr: any[] = Array.isArray(djInfo?.episodes)
+            ? djInfo.episodes
+            : djInfo?.results || djInfo?.data || djInfo?.items || [];
+          episodes = epsArr.map((ep: any, idx: number) => {
+            const numRaw = ep?.number ?? ep?.episode ?? ep?.ep ?? ep?.ep_num ?? idx + 1;
+            const num = typeof numRaw === "number" ? numRaw : Number(numRaw) || idx + 1;
+            const eid = ep?.id ?? ep?.episodeId ?? `${dexId}-${num}`;
+            return {
+              id: String(eid),
+              number: num,
+              title: ep?.title || ep?.name || undefined,
+              air_date: ep?.date || ep?.aired || null,
+            };
+          });
+        }
+      }
+    }
+
+    return res.json({
       episodes,
-      pagination: pagination
-        ? { ...pagination, last_visible_page: last }
-        : null,
+      pagination: pagination ? { ...pagination, last_visible_page: last } : null,
     });
   } catch (e: any) {
-    res.status(500).json({ error: e?.message || "Episodes failed" });
+    // Fallback unsuccessful
+    return res.json({ episodes: [], pagination: null });
   }
 };
 
@@ -283,8 +467,18 @@ export const getDiscover: RequestHandler = async (req, res) => {
     const url = `${JIKAN_BASE}/anime?${params.toString()}`;
     const j = await fetchJson(url, 12000);
 
-    const results = ((j?.data as any[]) || []).map(mapJikanAnimeToSummary);
-    const pi = j?.pagination || {};
+    let results = ((j?.data as any[]) || []).map(mapJikanAnimeToSummary);
+    let pi = j?.pagination || {};
+
+    if (!results.length) {
+      const dj = await fetchDex("/gogoPopular/1");
+      const arr: any[] = Array.isArray(dj)
+        ? dj
+        : dj?.results || dj?.data || dj?.items || dj?.animes || [];
+      results = arr.map(mapDexAnimeToSummary).slice(0, 24);
+      pi = { current_page: 1, has_next_page: false, last_visible_page: 1 };
+    }
+
     res.json({
       results,
       pagination: {
@@ -294,6 +488,16 @@ export const getDiscover: RequestHandler = async (req, res) => {
       },
     });
   } catch (e: any) {
+    const dj = await fetchDex("/gogoPopular/1");
+    const arr: any[] = Array.isArray(dj)
+      ? dj
+      : dj?.results || dj?.data || dj?.items || dj?.animes || [];
+    const results = arr.map(mapDexAnimeToSummary).slice(0, 24);
+    if (results.length)
+      return res.json({
+        results,
+        pagination: { page: 1, has_next_page: false, last_visible_page: 1 },
+      });
     res.status(500).json({ error: e?.message || "Discover failed" });
   }
 };
@@ -304,8 +508,9 @@ export const getGenres: RequestHandler = async (_req, res) => {
     const items: any[] = (j?.data as any[]) || [];
     const genres = items.map((g) => ({ id: g.mal_id, name: g.name }));
     res.json({ genres });
-  } catch (e: any) {
-    res.status(500).json({ error: e?.message || "Failed to fetch genres" });
+  } catch {
+    // Gracefully fallback to empty list so UI still works
+    res.json({ genres: [] });
   }
 };
 
@@ -319,8 +524,9 @@ export const getStreaming: RequestHandler = async (req, res) => {
       .filter((s) => s?.url)
       .map((s) => ({ name: s?.name || s?.site || "", url: s.url }));
     res.json({ links });
-  } catch (e: any) {
-    res.status(500).json({ error: e?.message || "Streaming providers failed" });
+  } catch {
+    // If Jikan streaming providers fail, return empty (we don't have dex episodeIds here)
+    res.json({ links: [] });
   }
 };
 
@@ -332,9 +538,24 @@ export const getNewReleases: RequestHandler = async (_req, res) => {
       j = await fetchJson(`${JIKAN_BASE}/seasons/now?limit=24&sfw`, 12000);
       if (j) setCached(key, j);
     }
-    const results = ((j?.data as any[]) || []).map(mapJikanAnimeToSummary);
+    let results = ((j?.data as any[]) || []).map(mapJikanAnimeToSummary);
+
+    if (!results.length) {
+      const dj = await fetchDex("/upcoming/1");
+      const arr: any[] = Array.isArray(dj)
+        ? dj
+        : dj?.results || dj?.data || dj?.items || dj?.animes || [];
+      results = arr.map(mapDexAnimeToSummary).slice(0, 24);
+    }
+
     res.json({ results });
   } catch (e: any) {
+    const dj = await fetchDex("/upcoming/1");
+    const arr: any[] = Array.isArray(dj)
+      ? dj
+      : dj?.results || dj?.data || dj?.items || dj?.animes || [];
+    const results = arr.map(mapDexAnimeToSummary).slice(0, 24);
+    if (results.length) return res.json({ results });
     res
       .status(500)
       .json({ error: e?.message || "Failed to fetch new releases" });
