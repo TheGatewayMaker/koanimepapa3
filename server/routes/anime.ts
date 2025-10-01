@@ -91,18 +91,47 @@ export const getSearch: RequestHandler = async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
     if (!q) return res.json({ results: [] });
-    const j = await fetchJson(
-      `${JIKAN_BASE}/anime?q=${encodeURIComponent(q)}&limit=20&sfw`,
-      12000,
-    );
-    const results = ((j?.data as any[]) || []).map((a: any) => ({
-      mal_id: a?.mal_id,
-      title: a?.title_english || a?.title,
-      image_url: a?.images?.jpg?.image_url,
-      type: a?.type,
-      year: a?.year ?? null,
-    }));
-    res.json({ results });
+
+    const url = `${JIKAN_BASE}/anime?q=${encodeURIComponent(q)}&limit=30&sfw&order_by=members&sort=desc`;
+    const j = await fetchJson(url, 12000);
+    const raw: any[] = (j?.data as any[]) || [];
+
+    // Basic fuzzy scoring against multiple title variants
+    const norm = (s: string) => s.toLowerCase();
+    const tokens = norm(q)
+      .split(/\s+/)
+      .filter(Boolean);
+    function score(item: any): number {
+      const titles: string[] = [];
+      if (item?.title) titles.push(item.title);
+      if (item?.title_english) titles.push(item.title_english);
+      if (Array.isArray(item?.titles)) titles.push(...item.titles.map((t: any) => t?.title).filter(Boolean));
+      const hay = norm(titles.join(" | "));
+      let s = 0;
+      for (const t of tokens) {
+        if (!t) continue;
+        if (hay.includes(t)) s += 5; // substring match
+        if (hay.startsWith(t)) s += 2; // prefix
+      }
+      // Boost by popularity proxies if available
+      if (typeof item?.members === "number") s += Math.min(10, Math.floor(item.members / 100000));
+      if (typeof item?.favorites === "number") s += Math.min(10, Math.floor(item.favorites / 10000));
+      return s;
+    }
+
+    const ranked = raw
+      .map((a) => ({ a, s: score(a) }))
+      .sort((x, y) => y.s - x.s)
+      .slice(0, 20)
+      .map(({ a }) => ({
+        mal_id: a?.mal_id,
+        title: a?.title_english || a?.title,
+        image_url: a?.images?.jpg?.image_url,
+        type: a?.type,
+        year: a?.year ?? null,
+      }));
+
+    res.json({ results: ranked });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Search failed" });
   }
