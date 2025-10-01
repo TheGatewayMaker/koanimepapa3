@@ -62,7 +62,7 @@ export function BannerCarousel({ items }: { items: BannerItem[] }) {
       onMouseEnter={() => (isHovering.current = true)}
       onMouseLeave={() => (isHovering.current = false)}
     >
-      <div className="overflow-hidden mx-auto max-w-6xl" ref={emblaRef}>
+      <div className="overflow-hidden w-full" ref={emblaRef}>
         <div className="flex touch-pan-y">
           {items.map((item) => (
             <Link
