@@ -2,7 +2,7 @@ import { RequestHandler } from "express";
 
 // Primary providers
 const ANILIST_ENDPOINT = "https://graphql.anilist.co";
-// Removed Anify; rely on AniList exclusively for stability
+const ANIFY_BASE = "https://api.anify.tv";
 
 // Simple in-memory cache with TTL
 const TTL_MS = 5 * 60 * 1000;
@@ -227,6 +227,21 @@ export const getInfo: RequestHandler = async (req, res) => {
   }
 };
 
+// helper fetch with timeout
+async function fetchJson(url: string, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: controller.signal });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const getEpisodes: RequestHandler = async (req, res) => {
   try {
     const idRaw = String(req.params.id || "").trim();
@@ -236,30 +251,34 @@ export const getEpisodes: RequestHandler = async (req, res) => {
     const ids = await getAniIdsByMalOrAni(idRaw);
     if (!ids.id) return res.json({ episodes: [], pagination: null });
 
-    const q = `query($id:Int!){
-      Media(id:$id, type: ANIME){
-        id idMal episodes format
-        streamingEpisodes{ title url site thumbnail }
-      }
-    }`;
-    const data = await gql<{ Media: any }>(q, { id: ids.id });
-    const m = data?.Media;
-    if (!m) return res.json({ episodes: [], pagination: null });
-
-    const totalCount = typeof m.episodes === "number" && m.episodes > 0 ? m.episodes : 0;
-    const se = Array.isArray(m.streamingEpisodes) ? m.streamingEpisodes : [];
-
-    // Build episodes list preferring streamingEpisodes order, fallback to count
-    let list: { id: string; number: number; title?: string }[] = [];
-    if (se.length > 0) {
-      list = se.map((e: any, idx: number) => ({
-        id: String(e.url || `${ids.id}-${idx + 1}`),
-        number: idx + 1,
-        title: typeof e.title === "string" ? e.title.replace(/<[^>]+>/g, "") : undefined,
-      }));
-    } else if (totalCount > 0) {
-      list = Array.from({ length: totalCount }, (_, i) => ({ id: `${ids.id}-${i + 1}`, number: i + 1 }));
+    // Use Anify as authoritative episodes source
+    const cacheKey = `anify:episodes:${ids.id}`;
+    let data = getCached<any[]>(cacheKey);
+    if (!data) {
+      data = await fetchJson(`${ANIFY_BASE}/episodes/${ids.id}`);
+      if (data) setCached(cacheKey, data);
     }
+    if (!data) return res.json({ episodes: [], pagination: null });
+
+    const providers: any[] = Array.isArray(data) ? data : [];
+    const preferred = ["gogoanime", "zoro", "aniwatch", "animepahe", "9anime", "aniwave"];
+    const sorted = providers.sort((a, b) => preferred.indexOf(a?.providerId) - preferred.indexOf(b?.providerId));
+
+    const map: Map<number, { id: string; number: number; title?: string }> = new Map();
+    for (const prov of sorted) {
+      const eps = Array.isArray(prov?.episodes) ? prov.episodes : [];
+      for (const ep of eps) {
+        const num = typeof ep.number === "number" ? ep.number : Number(ep.number) || 0;
+        if (!num || map.has(num)) continue;
+        map.set(num, {
+          id: String(ep.id ?? `${ids.id}-${num}`),
+          number: num,
+          title: ep.title || undefined,
+        });
+      }
+    }
+
+    const list = Array.from(map.values()).sort((a, b) => a.number - b.number);
 
     const total = list.length;
     const start = (page - 1) * perPage;
@@ -370,19 +389,43 @@ export const getGenres: RequestHandler = async (_req, res) => {
 export const getStreaming: RequestHandler = async (req, res) => {
   try {
     const idRaw = String(req.params.id || "").trim();
+    const epNum = Math.max(1, Number(req.query.ep || 1) || 1);
+    const subType = String(req.query.sub || "sub");
     const ids = await getAniIdsByMalOrAni(idRaw);
     if (!ids.id) return res.json({ links: [] });
 
-    const q = `query($id:Int!){
-      Media(id:$id, type: ANIME){ streamingEpisodes{ site url } }
-    }`;
-    const data = await gql<{ Media: any }>(q, { id: ids.id });
-    const se = data?.Media?.streamingEpisodes || [];
-    const links = Array.isArray(se)
-      ? se
-          .filter((s: any) => s?.url)
-          .map((s: any) => ({ name: String(s.site || ""), url: String(s.url) }))
-      : [];
+    const data = await fetchJson(`${ANIFY_BASE}/episodes/${ids.id}`);
+    if (!data) return res.json({ links: [] });
+    const providers: any[] = Array.isArray(data) ? data : [];
+    const preferred = ["gogoanime", "zoro", "aniwatch", "animepahe", "9anime", "aniwave"];
+
+    const links: { name: string; url: string }[] = [];
+
+    for (const prov of providers.sort((a, b) => preferred.indexOf(a?.providerId) - preferred.indexOf(b?.providerId))) {
+      const providerId = String(prov?.providerId || "");
+      if (!providerId) continue;
+      const eps = Array.isArray(prov?.episodes) ? prov.episodes : [];
+      const match = eps.find((e: any) => (typeof e.number === "number" ? e.number : Number(e.number) || 0) === epNum);
+      if (!match || !match.id) continue;
+
+      const params = new URLSearchParams({
+        providerId,
+        watchId: String(match.id),
+        episodeNumber: String(epNum),
+        id: String(ids.id),
+        subType,
+      });
+      const src = await fetchJson(`${ANIFY_BASE}/sources?${params.toString()}`, 10000);
+      const srcArr = (src && (src.sources || src.data || src.stream)) || [];
+      if (Array.isArray(srcArr)) {
+        for (const s of srcArr) if (s?.url) links.push({ name: providerId, url: s.url });
+      } else if (src?.url) {
+        links.push({ name: providerId, url: src.url });
+      }
+
+      if (links.length > 0) break;
+    }
+
     res.json({ links });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Streaming providers failed" });
