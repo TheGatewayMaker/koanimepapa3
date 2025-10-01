@@ -2,7 +2,7 @@ import { RequestHandler } from "express";
 
 // Primary providers
 const ANILIST_ENDPOINT = "https://graphql.anilist.co";
-const ANIFY_BASE = "https://api.anify.tv";
+// Removed Anify; rely on AniList exclusively for stability
 
 // Simple in-memory cache with TTL
 const TTL_MS = 5 * 60 * 1000;
@@ -193,7 +193,7 @@ export const getInfo: RequestHandler = async (req, res) => {
     const seen = new Set<number>([start.id]);
     const back: any[] = [];
     let node = start;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 3; i++) {
       const prev = pickEdge(node.relations?.edges, "PREQUEL");
       if (!prev || seen.has(prev.id)) break;
       seen.add(prev.id);
@@ -204,7 +204,7 @@ export const getInfo: RequestHandler = async (req, res) => {
     const chain = [...back.reverse(), start];
 
     node = start;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 3; i++) {
       const next = pickEdge(node.relations?.edges, "SEQUEL");
       if (!next || seen.has(next.id)) break;
       seen.add(next.id);
@@ -236,47 +236,41 @@ export const getEpisodes: RequestHandler = async (req, res) => {
     const ids = await getAniIdsByMalOrAni(idRaw);
     if (!ids.id) return res.json({ episodes: [], pagination: null });
 
-    const cacheKey = `anify:episodes:${ids.id}`;
-    let data = getCached<any[]>(cacheKey);
-    if (!data) {
-      const r = await fetch(`${ANIFY_BASE}/episodes/${ids.id}`);
-      if (!r.ok) return res.json({ episodes: [], pagination: null });
-      data = await r.json();
-      setCached(cacheKey, data);
-    }
-
-    // data is array of providers with episodes
-    const allEpisodes: { number: number; title?: string; air_date?: string | null; id: string }[] = [];
-    for (const provider of Array.isArray(data) ? data : []) {
-      const episodes = Array.isArray(provider?.episodes) ? provider.episodes : [];
-      for (const ep of episodes) {
-        const num = typeof ep.number === "number" ? ep.number : Number(ep.number) || 0;
-        if (!num) continue;
-        allEpisodes.push({
-          id: String(ep.id ?? `${ids.id}-${num}`),
-          number: num,
-          title: ep.title || undefined,
-          air_date: null,
-        });
+    const q = `query($id:Int!){
+      Media(id:$id, type: ANIME){
+        id idMal episodes format
+        streamingEpisodes{ title url site thumbnail }
       }
+    }`;
+    const data = await gql<{ Media: any }>(q, { id: ids.id });
+    const m = data?.Media;
+    if (!m) return res.json({ episodes: [], pagination: null });
+
+    const totalCount = typeof m.episodes === "number" && m.episodes > 0 ? m.episodes : 0;
+    const se = Array.isArray(m.streamingEpisodes) ? m.streamingEpisodes : [];
+
+    // Build episodes list preferring streamingEpisodes order, fallback to count
+    let list: { id: string; number: number; title?: string }[] = [];
+    if (se.length > 0) {
+      list = se.map((e: any, idx: number) => ({
+        id: String(e.url || `${ids.id}-${idx + 1}`),
+        number: idx + 1,
+        title: typeof e.title === "string" ? e.title.replace(/<[^>]+>/g, "") : undefined,
+      }));
+    } else if (totalCount > 0) {
+      list = Array.from({ length: totalCount }, (_, i) => ({ id: `${ids.id}-${i + 1}`, number: i + 1 }));
     }
 
-    // Deduplicate by episode number, keep lowest id lexicographically
-    const dedupMap = new Map<number, { id: string; number: number; title?: string; air_date?: string | null }>();
-    for (const ep of allEpisodes) {
-      if (!dedupMap.has(ep.number)) dedupMap.set(ep.number, ep);
-    }
-    const dedup = Array.from(dedupMap.values()).sort((a, b) => a.number - b.number);
-
-    const total = dedup.length;
+    const total = list.length;
     const start = (page - 1) * perPage;
-    const paged = dedup.slice(start, start + perPage);
+    const paged = list.slice(start, start + perPage);
     const pagination = {
       page,
       has_next_page: total > page * perPage,
       last_visible_page: Math.max(1, Math.ceil(total / perPage)),
       items: { count: Math.min(perPage, Math.max(0, total - start)), total, per_page: perPage },
     };
+
     return res.json({ episodes: paged, pagination });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Episodes failed" });
@@ -379,41 +373,16 @@ export const getStreaming: RequestHandler = async (req, res) => {
     const ids = await getAniIdsByMalOrAni(idRaw);
     if (!ids.id) return res.json({ links: [] });
 
-    // Get episodes from Anify and prepare sources for episode 1 across providers
-    const r = await fetch(`${ANIFY_BASE}/episodes/${ids.id}`);
-    if (!r.ok) return res.json({ links: [] });
-    const data = await r.json();
-
-    const links: { name: string; url: string }[] = [];
-    for (const prov of Array.isArray(data) ? data : []) {
-      try {
-        const providerId = prov?.providerId;
-        if (!providerId) continue;
-        const ep1 = Array.isArray(prov?.episodes)
-          ? prov.episodes.find((e: any) => (typeof e.number === "number" ? e.number : Number(e.number) || 0) === 1)
-          : null;
-        if (!ep1 || !ep1.id) continue;
-        const params = new URLSearchParams({
-          providerId: String(providerId),
-          watchId: String(ep1.id),
-          episodeNumber: "1",
-          id: String(ids.id),
-          subType: "sub",
-        });
-        const sr = await fetch(`${ANIFY_BASE}/sources?${params.toString()}`);
-        if (!sr.ok) continue;
-        const sj = await sr.json();
-        const srcArr = sj?.sources || sj?.data || sj?.stream || [];
-        if (Array.isArray(srcArr)) {
-          for (const s of srcArr) {
-            if (s?.url) links.push({ name: providerId, url: s.url });
-          }
-        } else if (sj?.url) {
-          links.push({ name: providerId, url: sj.url });
-        }
-      } catch {}
-    }
-
+    const q = `query($id:Int!){
+      Media(id:$id, type: ANIME){ streamingEpisodes{ site url } }
+    }`;
+    const data = await gql<{ Media: any }>(q, { id: ids.id });
+    const se = data?.Media?.streamingEpisodes || [];
+    const links = Array.isArray(se)
+      ? se
+          .filter((s: any) => s?.url)
+          .map((s: any) => ({ name: String(s.site || ""), url: String(s.url) }))
+      : [];
     res.json({ links });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Streaming providers failed" });
