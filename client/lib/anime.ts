@@ -184,8 +184,7 @@ export async function fetchEpisodes(
       return normalizeEpisodesResponse(data);
     }
     console.error("episodes endpoint returned", res.status);
-  } catch {
-  }
+  } catch {}
   return { episodes: [], pagination: null };
 }
 

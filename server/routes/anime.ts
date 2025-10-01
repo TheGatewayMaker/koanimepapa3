@@ -54,7 +54,11 @@ async function fetchDex(path: string, timeoutMs = 12000) {
   }
 }
 
-async function gql<T>(query: string, variables: Record<string, any>, timeoutMs = 12000): Promise<T | null> {
+async function gql<T>(
+  query: string,
+  variables: Record<string, any>,
+  timeoutMs = 12000,
+): Promise<T | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -105,9 +109,16 @@ function mapDexAnimeToSummary(a: any) {
     a?.id ?? a?.animeId ?? a?.mal_id ?? a?.slug ?? a?.gogo_id ?? a?.animeIdV2;
   const title = a?.title ?? a?.name ?? a?.animeTitle ?? a?.title_english ?? "";
   const image =
-    a?.image ?? a?.img ?? a?.poster ?? a?.cover ?? a?.picture ?? a?.thumbnail ?? "";
+    a?.image ??
+    a?.img ??
+    a?.poster ??
+    a?.cover ??
+    a?.picture ??
+    a?.thumbnail ??
+    "";
   const type = a?.type ?? a?.format ?? undefined;
-  const yearRaw = a?.year ?? a?.releaseDate ?? a?.released ?? a?.airedFrom ?? null;
+  const yearRaw =
+    a?.year ?? a?.releaseDate ?? a?.released ?? a?.airedFrom ?? null;
   const year =
     typeof yearRaw === "number"
       ? yearRaw
@@ -121,10 +132,17 @@ function mapDexAnimeToSummary(a: any) {
       : typeof ratingRaw === "string"
         ? Number(ratingRaw)
         : null;
-  const synopsis =
-    (a?.synopsis || a?.description || a?.overview || a?.plot || "").toString();
+  const synopsis = (
+    a?.synopsis ||
+    a?.description ||
+    a?.overview ||
+    a?.plot ||
+    ""
+  ).toString();
   const genres = Array.isArray(a?.genres)
-    ? a.genres.map((g: any) => (typeof g === "string" ? g : g?.name)).filter(Boolean)
+    ? a.genres
+        .map((g: any) => (typeof g === "string" ? g : g?.name))
+        .filter(Boolean)
     : [];
   return { id, title, image, type, year, rating, synopsis, genres };
 }
@@ -281,14 +299,22 @@ export const getInfo: RequestHandler = async (req, res) => {
       );
       const m = al?.Media;
       if (m) {
-        const title = (m?.title?.english || m?.title?.romaji || m?.title?.native || "").toString();
+        const title = (
+          m?.title?.english ||
+          m?.title?.romaji ||
+          m?.title?.native ||
+          ""
+        ).toString();
         const info = {
           ...mapDexAnimeToSummary({
             id: Number(id),
             title,
             image: m?.coverImage?.extraLarge || m?.coverImage?.large || "",
             year: m?.seasonYear ?? null,
-            rating: typeof m?.averageScore === "number" ? Math.round(m.averageScore / 10) : null,
+            rating:
+              typeof m?.averageScore === "number"
+                ? Math.round(m.averageScore / 10)
+                : null,
             format: m?.format,
             genres: m?.genres || [],
             description: (m?.description || "").toString(),
@@ -408,22 +434,33 @@ export const getEpisodes: RequestHandler = async (req, res) => {
         { idMal: Number(id) },
       );
       const title =
-        al?.Media?.title?.english || al?.Media?.title?.romaji || al?.Media?.title?.native || "";
+        al?.Media?.title?.english ||
+        al?.Media?.title?.romaji ||
+        al?.Media?.title?.native ||
+        "";
       if (title) {
         const djSearch = await fetchDex(`/search/${encodeURIComponent(title)}`);
         const arr: any[] = Array.isArray(djSearch)
           ? djSearch
-          : djSearch?.results || djSearch?.data || djSearch?.items || djSearch?.animes || [];
+          : djSearch?.results ||
+            djSearch?.data ||
+            djSearch?.items ||
+            djSearch?.animes ||
+            [];
         const cand = arr[0];
         const dexId = cand?.id ?? cand?.animeId ?? cand?.slug ?? null;
         if (dexId) {
-          const djInfo = await fetchDex(`/anime/${encodeURIComponent(String(dexId))}`);
+          const djInfo = await fetchDex(
+            `/anime/${encodeURIComponent(String(dexId))}`,
+          );
           const epsArr: any[] = Array.isArray(djInfo?.episodes)
             ? djInfo.episodes
             : djInfo?.results || djInfo?.data || djInfo?.items || [];
           episodes = epsArr.map((ep: any, idx: number) => {
-            const numRaw = ep?.number ?? ep?.episode ?? ep?.ep ?? ep?.ep_num ?? idx + 1;
-            const num = typeof numRaw === "number" ? numRaw : Number(numRaw) || idx + 1;
+            const numRaw =
+              ep?.number ?? ep?.episode ?? ep?.ep ?? ep?.ep_num ?? idx + 1;
+            const num =
+              typeof numRaw === "number" ? numRaw : Number(numRaw) || idx + 1;
             const eid = ep?.id ?? ep?.episodeId ?? `${dexId}-${num}`;
             return {
               id: String(eid),
@@ -438,7 +475,9 @@ export const getEpisodes: RequestHandler = async (req, res) => {
 
     return res.json({
       episodes,
-      pagination: pagination ? { ...pagination, last_visible_page: last } : null,
+      pagination: pagination
+        ? { ...pagination, last_visible_page: last }
+        : null,
     });
   } catch (e: any) {
     // Fallback unsuccessful
