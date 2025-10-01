@@ -39,7 +39,7 @@ export default function AnimePage() {
           const baseSeason =
             i.seasons && i.seasons.length > 0 ? i.seasons[0].id : id;
           setSelectedId(baseSeason);
-          const s = await fetchStreams(baseSeason).catch(() => []);
+          const s = await fetchStreams(baseSeason, 1).catch(() => []);
           setStreams(s || []);
         }
       } catch (e) {
