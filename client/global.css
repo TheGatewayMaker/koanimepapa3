@@ -1,0 +1,180 @@
+/** @import must precede all other statements */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /**
+   * Tailwind CSS theme
+   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
+   * A different format will require also updating the theme in tailwind.config.ts.
+  */
+  :root {
+    /* KoAnime light theme */
+    --background: 0 0% 100%;
+    --foreground: 234 15% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 234 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 234 15% 15%;
+
+    /* Neon purple primary */
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 234 15% 15%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 258 100% 97%;
+    --accent-foreground: 262 83% 30%;
+
+    --destructive: 0 85% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 262 83% 58%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar palette */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 234 15% 15%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 258 100% 97%;
+    --sidebar-accent-foreground: 262 83% 30%;
+    --sidebar-border: 220 13% 90%;
+    --sidebar-ring: 262 83% 58%;
+  }
+
+  .dark {
+    /* KoAnime dark theme */
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 7%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 7%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 265 89% 64%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 7% 12%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 7% 12%;
+    --muted-foreground: 240 5% 64%;
+
+    --accent: 265 89% 64%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 75% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 7% 18%;
+    --input: 240 7% 18%;
+    --ring: 265 89% 64%;
+
+    --sidebar-background: 240 7% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 265 89% 64%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 6% 16%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 6% 16%;
+    --sidebar-ring: 265 89% 64%;
+  }
+
+  /* Ambient theme uses subtle animated gradient background while keeping readable foreground */
+  .ambient {
+    --background: 249 20% 6%;
+    --foreground: 0 0% 98%;
+
+    --card: 249 20% 8%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 249 20% 8%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 280 86% 65%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 250 14% 14%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 250 14% 14%;
+    --muted-foreground: 250 8% 70%;
+
+    --accent: 280 86% 65%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 75% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 250 13% 20%;
+    --input: 250 13% 20%;
+    --ring: 280 86% 65%;
+  }
+
+  .ambient body,
+  body.ambient {
+    background-image:
+      radial-gradient(
+        1200px 600px at 10% 10%,
+        hsl(280 86% 18% / 0.35),
+        transparent
+      ),
+      radial-gradient(
+        900px 600px at 90% 30%,
+        hsl(210 90% 28% / 0.25),
+        transparent
+      ),
+      radial-gradient(
+        1000px 800px at 40% 100%,
+        hsl(320 88% 22% / 0.25),
+        transparent
+      );
+    background-color: hsl(var(--background));
+    background-attachment: fixed;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  .glass {
+    @apply bg-white/5 backdrop-blur-md border border-white/10;
+  }
+
+  .hover-raise {
+    @apply transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.35);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
