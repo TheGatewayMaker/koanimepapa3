@@ -93,6 +93,18 @@ export default function Index() {
         ]);
         setNewReleases(newR);
         setTrending(trend);
+
+        const toBanner: BannerItem[] = (trend || []).slice(0, 10).map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          image: a.image,
+          description: truncateText(a.synopsis || ""),
+          rating: typeof a.rating === "number" ? a.rating : null,
+          subDub: a.subDub || null,
+          year: a.year ?? null,
+          type: a.type ?? null,
+        }));
+        if (toBanner.length) setBanner(toBanner);
       } finally {
         setLoading(false);
       }
@@ -107,31 +119,6 @@ export default function Index() {
     return cut.slice(0, last > 80 ? last : max) + "…";
   }
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const enriched: BannerItem[] = [];
-        for (const b of BANNERS) {
-          try {
-            const r = await fetch(`/api/anime/info/${b.id}`);
-            if (!r.ok) {
-              enriched.push(b);
-              continue;
-            }
-            const info = await r.json();
-            const desc = truncateText(info?.synopsis || "");
-            const img = info?.image || b.image;
-            enriched.push({ ...b, description: desc, image: img });
-          } catch {
-            enriched.push(b);
-          }
-        }
-        setBanner(enriched);
-      } catch {
-        // ignore
-      }
-    })();
-  }, []);
 
   return (
     <Layout>
