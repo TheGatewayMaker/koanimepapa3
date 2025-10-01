@@ -94,16 +94,18 @@ export default function Index() {
         setNewReleases(newR);
         setTrending(trend);
 
-        const toBanner: BannerItem[] = (trend || []).slice(0, 10).map((a: any) => ({
-          id: a.id,
-          title: a.title,
-          image: a.image,
-          description: truncateText(a.synopsis || ""),
-          rating: typeof a.rating === "number" ? a.rating : null,
-          subDub: a.subDub || null,
-          year: a.year ?? null,
-          type: a.type ?? null,
-        }));
+        const toBanner: BannerItem[] = (trend || [])
+          .slice(0, 10)
+          .map((a: any) => ({
+            id: a.id,
+            title: a.title,
+            image: a.image,
+            description: truncateText(a.synopsis || ""),
+            rating: typeof a.rating === "number" ? a.rating : null,
+            subDub: a.subDub || null,
+            year: a.year ?? null,
+            type: a.type ?? null,
+          }));
         if (toBanner.length) setBanner(toBanner);
       } finally {
         setLoading(false);
@@ -118,7 +120,6 @@ export default function Index() {
     const last = cut.lastIndexOf(" ");
     return cut.slice(0, last > 80 ? last : max) + "…";
   }
-
 
   return (
     <Layout>
