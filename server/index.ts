@@ -12,6 +12,11 @@ import {
   getStreaming,
   getNewReleases,
 } from "./routes/anime";
+import {
+  searchAniList,
+  getAniListInfo,
+  getAniListEpisodes,
+} from "./routes/anilist";
 
 export function createServer() {
   const app = express();
@@ -29,7 +34,7 @@ export function createServer() {
 
   app.get("/api/demo", handleDemo);
 
-  // Anime API proxies
+  // Anime API proxies (Jikan)
   app.get("/api/anime/trending", getTrending);
   app.get("/api/anime/search", getSearch);
   app.get("/api/anime/info/:id", getInfo);
@@ -38,6 +43,11 @@ export function createServer() {
   app.get("/api/anime/genres", getGenres);
   app.get("/api/anime/streams/:id", getStreaming);
   app.get("/api/anime/new", getNewReleases);
+
+  // AniList API routes
+  app.get("/api/anilist/search", searchAniList);
+  app.get("/api/anilist/info/:id", getAniListInfo);
+  app.get("/api/anilist/episodes/:id", getAniListEpisodes);
 
   return app;
 }
