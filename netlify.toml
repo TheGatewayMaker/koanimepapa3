@@ -4,7 +4,7 @@
   publish = "dist/spa"
 
 [functions]
-  external_node_modules = ["express"]
+  external_node_modules = ["express", "undici"]
   node_bundler = "esbuild"
 
 # API routes handled by Netlify Functions
