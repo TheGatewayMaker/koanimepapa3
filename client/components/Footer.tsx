@@ -26,7 +26,7 @@ export function Footer() {
         </div>
         <p className="mt-6 text-xs">
           © {new Date().getFullYear()} KoAnime. Data sourced from third-party
-          APIs (Jikan, AniList, Gogoanime). Streaming sources may be unavailable
+          APIs (AniList, Anify; providers like Gogoanime, Zoro/Aniwatch, AnimePahe). Streaming sources may be unavailable
           in some regions.
         </p>
       </div>
