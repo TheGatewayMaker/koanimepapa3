@@ -1,11 +1,85 @@
 import { useEffect, useState } from "react";
 import { Layout } from "../components/Layout";
 import { BannerCarousel } from "../components/BannerCarousel";
+import type { BannerItem } from "../components/BannerCarousel";
 import { AnimeCard } from "../components/AnimeCard";
 import { fetchTrending, fetchNewReleases } from "../lib/anime";
 
+const BANNERS: BannerItem[] = [
+  {
+    id: 16498,
+    title: "Attack on Titan",
+    image: "https://cdn.myanimelist.net/images/anime/10/47347.jpg",
+    year: 2013,
+    type: "TV",
+  },
+  {
+    id: 38000,
+    title: "Demon Slayer: Kimetsu no Yaiba",
+    image: "https://cdn.myanimelist.net/images/anime/1286/99889.jpg",
+    year: 2019,
+    type: "TV",
+  },
+  {
+    id: 40748,
+    title: "Jujutsu Kaisen",
+    image: "https://cdn.myanimelist.net/images/anime/1171/109222.jpg",
+    year: 2020,
+    type: "TV",
+  },
+  {
+    id: 21,
+    title: "One Piece",
+    image: "https://cdn.myanimelist.net/images/anime/6/73245.jpg",
+    year: 1999,
+    type: "TV",
+  },
+  {
+    id: 44511,
+    title: "Chainsaw Man",
+    image: "https://cdn.myanimelist.net/images/anime/1806/126216.jpg",
+    year: 2022,
+    type: "TV",
+  },
+  {
+    id: 50265,
+    title: "SPY x FAMILY",
+    image: "https://cdn.myanimelist.net/images/anime/1441/122795.jpg",
+    year: 2022,
+    type: "TV",
+  },
+  {
+    id: 41467,
+    title: "Bleach: Sennen Kessen-hen",
+    image: "https://cdn.myanimelist.net/images/anime/1764/126627.jpg",
+    year: 2022,
+    type: "TV",
+  },
+  {
+    id: 31964,
+    title: "My Hero Academia",
+    image: "https://cdn.myanimelist.net/images/anime/10/78745.jpg",
+    year: 2016,
+    type: "TV",
+  },
+  {
+    id: 1735,
+    title: "Naruto: Shippuuden",
+    image: "https://cdn.myanimelist.net/images/anime/5/17407.jpg",
+    year: 2007,
+    type: "TV",
+  },
+  {
+    id: 11757,
+    title: "Sword Art Online",
+    image: "https://cdn.myanimelist.net/images/anime/11/39717.jpg",
+    year: 2012,
+    type: "TV",
+  },
+];
+
 export default function Index() {
-  const [banner, setBanner] = useState<any[]>([]);
+  const [banner] = useState<BannerItem[]>(BANNERS);
   const [newReleases, setNewReleases] = useState<any[]>([]);
   const [trending, setTrending] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,18 +92,6 @@ export default function Index() {
           fetchTrending(),
         ]);
         setNewReleases(newR);
-        setBanner(
-          newR.slice(0, 10).map((t) => ({
-            id: t.id,
-            title: t.title,
-            image: t.image,
-            description: t.synopsis,
-            rating: t.rating,
-            subDub: t.subDub ?? null,
-            year: t.year ?? null,
-            type: t.type ?? null,
-          })),
-        );
         setTrending(trend);
       } finally {
         setLoading(false);
