@@ -144,6 +144,24 @@ export const getSearch: RequestHandler = async (req, res) => {
   }
 };
 
+async function fetchWithRelations(id: number) {
+  const q = `query($id:Int!){
+    Media(id:$id, type: ANIME){
+      id idMal format title{ userPreferred }
+      relations{ edges{ relationType node{ id idMal format title{ userPreferred } } } }
+    }
+  }`;
+  const d = await gql<{ Media: any }>(q, { id });
+  return d?.Media ?? null;
+}
+
+function pickEdge(edges: any[], type: "PREQUEL" | "SEQUEL") {
+  const list = Array.isArray(edges) ? edges : [];
+  const candidates = list.filter((e) => e?.relationType === type).map((e) => e.node);
+  const tv = candidates.find((n: any) => n?.format === "TV" || n?.format === "ONA");
+  return tv || candidates[0] || null;
+}
+
 export const getInfo: RequestHandler = async (req, res) => {
   try {
     const raw = String(req.params.id || "").trim();
@@ -164,7 +182,46 @@ export const getInfo: RequestHandler = async (req, res) => {
     const m = data?.Media;
     if (!m) return res.status(404).json({ error: "Not found" });
     const base = mapAnilistToSummary(m);
-    return res.json({ ...base, seasons: [] });
+
+    // If movie, no seasons
+    if (m.format === "MOVIE") return res.json({ ...base, seasons: [] });
+
+    // Build seasons chain using PREQUEL/SEQUEL relations
+    const start = await fetchWithRelations(m.id);
+    if (!start) return res.json({ ...base, seasons: [] });
+
+    const seen = new Set<number>([start.id]);
+    const back: any[] = [];
+    let node = start;
+    for (let i = 0; i < 8; i++) {
+      const prev = pickEdge(node.relations?.edges, "PREQUEL");
+      if (!prev || seen.has(prev.id)) break;
+      seen.add(prev.id);
+      back.push(prev);
+      node = await fetchWithRelations(prev.id);
+      if (!node) break;
+    }
+    const chain = [...back.reverse(), start];
+
+    node = start;
+    for (let i = 0; i < 8; i++) {
+      const next = pickEdge(node.relations?.edges, "SEQUEL");
+      if (!next || seen.has(next.id)) break;
+      seen.add(next.id);
+      chain.push(next);
+      node = await fetchWithRelations(next.id);
+      if (!node) break;
+    }
+
+    const seasons = chain
+      .filter((n) => n && n.format !== "MOVIE")
+      .map((n, idx) => ({
+        id: n.idMal || n.id,
+        number: idx + 1,
+        title: normalizeBaseTitle(n?.title?.userPreferred || ""),
+      }));
+
+    return res.json({ ...base, seasons });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Info failed" });
   }
@@ -243,9 +300,9 @@ export const getDiscover: RequestHandler = async (req, res) => {
     };
     const sort = sortMap[order_by] || (sortDir === "asc" ? "POPULARITY" : "POPULARITY_DESC");
 
-    const variables: Record<string, any> = { page, perPage: 24, sort, q: q || null, genre: genre || null };
+    const variables: Record<string, any> = { page, perPage: 24, sort, q: q || null, genres: genre ? [genre] : null };
 
-    const query = `query($page:Int,$perPage:Int,$q:String,$genre:String,$sort:[MediaSort]){
+    const query = `query($page:Int,$perPage:Int,$q:String,$genres:[String],$sort:[MediaSort]){
       Page(page:$page, perPage:$perPage){
         pageInfo{ total perPage currentPage lastPage hasNextPage }
         media(
@@ -253,7 +310,7 @@ export const getDiscover: RequestHandler = async (req, res) => {
           type: ANIME,
           isAdult:false,
           sort:$sort,
-          ${genre ? "genre_in: [$genre]," : ""}
+          genre_in: $genres
         ){
           id idMal title { userPreferred } coverImage{ large extraLarge }
           format seasonYear averageScore genres description
