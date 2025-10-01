@@ -110,20 +110,22 @@ export default function Index() {
   useEffect(() => {
     (async () => {
       try {
-        const enriched = await Promise.all(
-          BANNERS.map(async (b) => {
-            try {
-              const r = await fetch(`/api/anime/info/${b.id}`);
-              if (!r.ok) return b;
-              const info = await r.json();
-              const desc = truncateText(info?.synopsis || "");
-              const img = info?.image || b.image;
-              return { ...b, description: desc, image: img } as BannerItem;
-            } catch {
-              return b;
+        const enriched: BannerItem[] = [];
+        for (const b of BANNERS) {
+          try {
+            const r = await fetch(`/api/anime/info/${b.id}`);
+            if (!r.ok) {
+              enriched.push(b);
+              continue;
             }
-          }),
-        );
+            const info = await r.json();
+            const desc = truncateText(info?.synopsis || "");
+            const img = info?.image || b.image;
+            enriched.push({ ...b, description: desc, image: img });
+          } catch {
+            enriched.push(b);
+          }
+        }
         setBanner(enriched);
       } catch {
         // ignore
