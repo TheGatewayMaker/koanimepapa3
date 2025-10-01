@@ -25,7 +25,7 @@ export function Footer() {
           </nav>
         </div>
         <p className="mt-6 text-xs">
-          © {new Date().getFullYear()} KoAnime. Data sourced from AniList. Streaming availability varies by region/platform.
+          © {new Date().getFullYear()} KoAnime. Data sourced from Jikan (MyAnimeList). Streaming availability varies by region/platform.
         </p>
       </div>
     </footer>
