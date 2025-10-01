@@ -9,10 +9,9 @@
 
 # API routes handled by Netlify Functions
 [[redirects]]
-  force = true
   from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
   status = 200
-  to = "/.netlify/functions/api/api/:splat"
 
 # SPA fallback for client-side routing
 [[redirects]]
