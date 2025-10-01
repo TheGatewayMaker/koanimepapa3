@@ -79,7 +79,7 @@ const BANNERS: BannerItem[] = [
 ];
 
 export default function Index() {
-  const [banner] = useState<BannerItem[]>(BANNERS);
+  const [banner, setBanner] = useState<BannerItem[]>(BANNERS);
   const [newReleases, setNewReleases] = useState<any[]>([]);
   const [trending, setTrending] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +95,40 @@ export default function Index() {
         setTrending(trend);
       } finally {
         setLoading(false);
+      }
+    })();
+  }, []);
+
+  function truncateText(s: string, max = 160) {
+    const text = (s || "").toString().replace(/\s+/g, " ").trim();
+    if (text.length <= max) return text;
+    const cut = text.slice(0, max);
+    const last = cut.lastIndexOf(" ");
+    return cut.slice(0, last > 80 ? last : max) + "…";
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const enriched: BannerItem[] = [];
+        for (const b of BANNERS) {
+          try {
+            const r = await fetch(`/api/anime/info/${b.id}`);
+            if (!r.ok) {
+              enriched.push(b);
+              continue;
+            }
+            const info = await r.json();
+            const desc = truncateText(info?.synopsis || "");
+            const img = info?.image || b.image;
+            enriched.push({ ...b, description: desc, image: img });
+          } catch {
+            enriched.push(b);
+          }
+        }
+        setBanner(enriched);
+      } catch {
+        // ignore
       }
     })();
   }, []);
