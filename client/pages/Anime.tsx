@@ -6,8 +6,6 @@ import {
   fetchEpisodes,
   ApiAnimeSummary,
   EpisodeItem,
-  fetchStreams,
-  StreamLink,
 } from "../lib/anime";
 import { toast } from "sonner";
 
@@ -18,7 +16,6 @@ export default function AnimePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [episodes, setEpisodes] = useState<EpisodeItem[]>([]);
   const [episodesPagination, setEpisodesPagination] = useState<any>(null);
-  const [streams, setStreams] = useState<StreamLink[]>([]);
   const [loadingInfo, setLoadingInfo] = useState(true);
   const [loadingEpisodes, setLoadingEpisodes] = useState(true);
 
@@ -33,14 +30,11 @@ export default function AnimePage() {
           });
           setInfo(null);
           setSelectedId(id);
-          setStreams([]);
         } else {
           setInfo(i);
           const baseSeason =
             i.seasons && i.seasons.length > 0 ? i.seasons[0].id : id;
           setSelectedId(baseSeason);
-          const s = await fetchStreams(baseSeason).catch(() => []);
-          setStreams(s || []);
         }
       } catch (e) {
         console.error(e);
@@ -49,7 +43,6 @@ export default function AnimePage() {
         });
         setInfo(null);
         setSelectedId(id);
-        setStreams([]);
       } finally {
         setLoadingInfo(false);
       }
@@ -163,68 +156,34 @@ export default function AnimePage() {
           )}
 
           <div className="container mx-auto px-4 pb-10">
-            {streams.length > 0 && (
-              <div className="mb-8">
-                <h2 className="mb-3 text-lg font-semibold">Where to watch</h2>
-                <div className="flex flex-wrap gap-2">
-                  {streams.map((s) => (
-                    <a
-                      key={s.url}
-                      href={s.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center rounded-md border px-3 py-2 text-sm hover:bg-accent"
-                    >
-                      {s.name}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <h2 className="mb-3 text-lg font-semibold">Episodes</h2>
 
-            <div className="mb-4 flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">Season</label>
-                <div className="relative inline-block">
-                  <select
-                    value={selectedId ?? undefined}
-                    onChange={(e) => setSelectedId(Number(e.target.value))}
-                    className="appearance-none rounded-md border bg-background px-4 py-2 pr-8 text-sm transition-shadow duration-150 hover:shadow-sm focus:shadow-md focus:outline-none"
-                    aria-label="Select season"
+            {info?.type !== "MOVIE" && (
+              <div className="mb-4 flex items-center gap-3 overflow-x-auto pb-1">
+                {seasons.length > 0 ? (
+                  seasons.map((s, i) => {
+                    const active = s.id === (selectedId ?? id);
+                    return (
+                      <button
+                        key={s.id}
+                        className={`whitespace-nowrap rounded-full border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+                        onClick={() => setSelectedId(s.id)}
+                        aria-pressed={active}
+                      >
+                        {`Season ${i + 1}`}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <button
+                    className="rounded-full border px-3 py-1 text-sm"
+                    disabled
                   >
-                    {seasons.length > 0 ? (
-                      seasons.map((s, i) => (
-                        <option
-                          key={s.id}
-                          value={s.id}
-                        >{`Season ${i + 1}`}</option>
-                      ))
-                    ) : (
-                      <option value={selectedId ?? id}>Season 1</option>
-                    )}
-                  </select>
-                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      className="text-foreground/70"
-                    >
-                      <path
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 9l6 6 6-6"
-                      />
-                    </svg>
-                  </span>
-                </div>
+                    Season 1
+                  </button>
+                )}
               </div>
-            </div>
+            )}
 
             {loadingEpisodes ? (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
@@ -241,17 +200,12 @@ export default function AnimePage() {
                   <button
                     key={ep.id + "-" + ep.number}
                     className="rounded border px-3 py-2 text-left text-sm hover:bg-accent"
-                    onClick={() => {
-                      if (streams.length > 0) {
-                        window.open(streams[0].url, "_blank", "noreferrer");
-                      } else {
-                        toast("Streaming not available", {
-                          description:
-                            "Streaming providers not reported for this title.",
-                          duration: 2500,
-                        });
-                      }
-                    }}
+                    onClick={() =>
+                      toast("Streaming links unavailable", {
+                        description: "Where to watch will be added later.",
+                        duration: 2500,
+                      })
+                    }
                   >
                     <div className="font-medium">Episode {ep.number}</div>
                     {ep.title && (

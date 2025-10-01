@@ -12,9 +12,20 @@ export interface ApiAnimeSummary {
   isNewSeason?: boolean;
 }
 
+function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = 10000,
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const merged = { ...init, signal: controller.signal } as RequestInit;
+  return fetch(input, merged).finally(() => clearTimeout(timer));
+}
+
 export async function fetchTrending(): Promise<ApiAnimeSummary[]> {
   try {
-    const res = await fetch("/api/anime/trending");
+    const res = await fetchWithTimeout("/api/anime/trending");
     if (!res.ok) {
       console.error(
         "fetchTrending failed",
@@ -56,7 +67,7 @@ export async function fetchDiscover(
     if (params.page) qs.set("page", String(params.page));
     if (params.order_by) qs.set("order_by", params.order_by);
     if (params.sort) qs.set("sort", params.sort);
-    const res = await fetch(`/api/anime/discover?${qs.toString()}`);
+    const res = await fetchWithTimeout(`/api/anime/discover?${qs.toString()}`);
     if (!res.ok) {
       console.error(
         "fetchDiscover failed",
@@ -92,7 +103,7 @@ export interface GenreItem {
 }
 export async function fetchGenres(): Promise<GenreItem[]> {
   try {
-    const res = await fetch("/api/anime/genres");
+    const res = await fetchWithTimeout("/api/anime/genres");
     if (!res.ok) {
       console.error(
         "fetchGenres failed",
@@ -113,9 +124,18 @@ export interface StreamLink {
   name: string;
   url: string;
 }
-export async function fetchStreams(id: number): Promise<StreamLink[]> {
+export async function fetchStreams(
+  id: number,
+  ep?: number,
+  sub: "sub" | "dub" = "sub",
+): Promise<StreamLink[]> {
   try {
-    const res = await fetch(`/api/anime/streams/${id}`);
+    const qs = new URLSearchParams();
+    if (ep) qs.set("ep", String(ep));
+    if (sub) qs.set("sub", sub);
+    const res = await fetchWithTimeout(
+      `/api/anime/streams/${id}?${qs.toString()}`,
+    );
     if (!res.ok) {
       console.error(
         "fetchStreams failed",
@@ -134,7 +154,7 @@ export async function fetchStreams(id: number): Promise<StreamLink[]> {
 
 export async function fetchNewReleases(): Promise<ApiAnimeSummary[]> {
   try {
-    const res = await fetch("/api/anime/new");
+    const res = await fetchWithTimeout("/api/anime/new");
     if (!res.ok) {
       console.error(
         "fetchNewReleases failed",
@@ -155,7 +175,7 @@ export async function fetchAnimeInfo(
   id: number,
 ): Promise<ApiAnimeSummary | null> {
   try {
-    const res = await fetch(`/api/anime/info/${id}`);
+    const res = await fetchWithTimeout(`/api/anime/info/${id}`);
     if (!res.ok) {
       console.error(
         "fetchAnimeInfo failed",
@@ -190,7 +210,11 @@ export async function fetchEpisodes(
   page = 1,
 ): Promise<EpisodesResponse> {
   try {
-    const res = await fetch(`/api/anime/episodes/${id}?page=${page}`);
+    const res = await fetchWithTimeout(
+      `/api/anime/episodes/${id}?page=${page}`,
+      {},
+      12000,
+    );
     if (res.ok) {
       const data = await res.json();
       return normalizeEpisodesResponse(data);

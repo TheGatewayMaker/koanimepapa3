@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/Layout";
 import { AnimeCard } from "../components/AnimeCard";
-import { fetchDiscover, fetchGenres, DiscoverResponse } from "../lib/anime";
+import { fetchDiscover, DiscoverResponse } from "../lib/anime";
 import { useSearchParams } from "react-router-dom";
 
 export default function Discover() {
@@ -13,26 +13,39 @@ export default function Discover() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DiscoverResponse | null>(null);
-  const [genres, setGenres] = useState<{ id: number; name: string }[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const list = await fetchGenres();
-        setGenres(list);
-      } catch (e) {
-        setGenres([]);
-      }
-    })();
-  }, []);
+  const [showAllGenres, setShowAllGenres] = useState(false);
+  const GENRES = [
+    "Action",
+    "Adventure",
+    "Comedy",
+    "Drama",
+    "Fantasy",
+    "Sci-Fi",
+    "Slice of Life",
+    "Mystery",
+    "Romance",
+    "Horror",
+    "Supernatural",
+    "Sports",
+    "Mecha",
+    "Music",
+    "Psychological",
+    "Thriller",
+    "Isekai",
+    "Historical",
+    "Military",
+    "School",
+    "Seinen",
+    "Shoujo",
+    "Shounen",
+    "Josei",
+  ];
 
   const selectedGenreValid = useMemo(() => {
     if (!genre) return "";
-    const found = genres.find(
-      (g) => g.name.toLowerCase() === genre.toLowerCase(),
-    );
-    return found?.name || "";
-  }, [genre, genres]);
+    const found = GENRES.find((g) => g.toLowerCase() === genre.toLowerCase());
+    return found || "";
+  }, [genre]);
 
   async function load(p = 1, append = false) {
     setLoading(true);
@@ -91,21 +104,45 @@ export default function Discover() {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          {genres.map((g) => {
-            const active = g.name.toLowerCase() === genre.toLowerCase();
-            return (
-              <button
-                key={g.id}
-                className={`rounded-full border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
-                onClick={() => {
-                  setGenre(active ? "" : g.name);
-                }}
-              >
-                {g.name}
-              </button>
-            );
-          })}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {GENRES.slice(0, 10).map((g) => {
+              const active = g.toLowerCase() === genre.toLowerCase();
+              return (
+                <button
+                  key={g}
+                  className={`whitespace-nowrap rounded-full border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+                  onClick={() => setGenre(active ? "" : g)}
+                >
+                  {g}
+                </button>
+              );
+            })}
+            <button
+              className="rounded-full border px-3 py-1 text-sm hover:bg-accent"
+              onClick={() => setShowAllGenres((v) => !v)}
+              aria-expanded={showAllGenres}
+              aria-controls="all-genres"
+            >
+              More
+            </button>
+          </div>
+          {showAllGenres && (
+            <div id="all-genres" className="mt-2 flex flex-wrap gap-2">
+              {GENRES.map((g) => {
+                const active = g.toLowerCase() === genre.toLowerCase();
+                return (
+                  <button
+                    key={g}
+                    className={`rounded-full border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+                    onClick={() => setGenre(active ? "" : g)}
+                  >
+                    {g}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {loading && !data ? (
