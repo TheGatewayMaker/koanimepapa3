@@ -223,13 +223,22 @@ export default function AnimePage() {
                   <button
                     key={ep.id + "-" + ep.number}
                     className="rounded border px-3 py-2 text-left text-sm hover:bg-accent"
-                    onClick={() => {
-                      if (streams.length > 0) {
-                        window.open(streams[0].url, "_blank", "noreferrer");
-                      } else {
-                        toast("Streaming not available", {
-                          description:
-                            "Streaming providers not reported for this title.",
+                    onClick={async () => {
+                      try {
+                        const src = await fetchStreams(selectedId ?? id, ep.number);
+                        if (src && src.length > 0) {
+                          window.open(src[0].url, "_blank", "noreferrer");
+                        } else if (streams.length > 0) {
+                          window.open(streams[0].url, "_blank", "noreferrer");
+                        } else {
+                          toast("Streaming not available", {
+                            description: "No sources were found for this episode.",
+                            duration: 2500,
+                          });
+                        }
+                      } catch (e) {
+                        toast("Streaming error", {
+                          description: "Failed to load sources for this episode.",
                           duration: 2500,
                         });
                       }
