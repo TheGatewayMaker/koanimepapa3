@@ -120,9 +120,12 @@ export interface StreamLink {
   name: string;
   url: string;
 }
-export async function fetchStreams(id: number): Promise<StreamLink[]> {
+export async function fetchStreams(id: number, ep?: number, sub: "sub" | "dub" = "sub"): Promise<StreamLink[]> {
   try {
-    const res = await fetchWithTimeout(`/api/anime/streams/${id}`);
+    const qs = new URLSearchParams();
+    if (ep) qs.set("ep", String(ep));
+    if (sub) qs.set("sub", sub);
+    const res = await fetchWithTimeout(`/api/anime/streams/${id}?${qs.toString()}`);
     if (!res.ok) {
       console.error(
         "fetchStreams failed",
@@ -197,7 +200,7 @@ export async function fetchEpisodes(
   page = 1,
 ): Promise<EpisodesResponse> {
   try {
-    const res = await fetchWithTimeout(`/api/anime/episodes/${id}?page=${page}`);
+    const res = await fetchWithTimeout(`/api/anime/episodes/${id}?page=${page}`, {}, 12000);
     if (res.ok) {
       const data = await res.json();
       return normalizeEpisodesResponse(data);
