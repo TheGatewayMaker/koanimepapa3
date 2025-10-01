@@ -1,6 +1,9 @@
 {
   "name": "fusion-starter",
   "private": true,
+  "engines": {
+    "node": ">=18.17.0"
+  },
   "type": "module",
   "pkg": {
     "assets": [
