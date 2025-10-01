@@ -15,7 +15,11 @@ function setCached(key: string, data: any) {
   cache[key] = { at: Date.now(), data };
 }
 
-async function gql<T>(query: string, variables: Record<string, any>, timeoutMs = 12000): Promise<T | null> {
+async function gql<T>(
+  query: string,
+  variables: Record<string, any>,
+  timeoutMs = 12000,
+): Promise<T | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -37,19 +41,30 @@ async function gql<T>(query: string, variables: Record<string, any>, timeoutMs =
 }
 
 function normalizeTitle(t: any): string {
-  return (
-    t?.english || t?.romaji || t?.native || t?.userPreferred || ""
-  ) as string;
+  return (t?.english ||
+    t?.romaji ||
+    t?.native ||
+    t?.userPreferred ||
+    "") as string;
 }
 
 function mapMediaToSummary(m: any) {
   const id: number = m?.id;
   const title: string = normalizeTitle(m?.title);
-  const image: string = m?.coverImage?.extraLarge || m?.coverImage?.large || m?.coverImage?.medium || "";
+  const image: string =
+    m?.coverImage?.extraLarge ||
+    m?.coverImage?.large ||
+    m?.coverImage?.medium ||
+    "";
   const type: string | undefined = m?.format || undefined;
   const year: number | null = m?.seasonYear ?? null;
-  const rating: number | null = typeof m?.averageScore === "number" ? Math.round((m.averageScore as number) / 10) : null;
-  const synopsis: string = (m?.description || "").replace(/<[^>]+>/g, "").trim();
+  const rating: number | null =
+    typeof m?.averageScore === "number"
+      ? Math.round((m.averageScore as number) / 10)
+      : null;
+  const synopsis: string = (m?.description || "")
+    .replace(/<[^>]+>/g, "")
+    .trim();
   const genres: string[] = Array.isArray(m?.genres) ? m.genres : [];
   return { id, title, image, type, year, rating, synopsis, genres };
 }
@@ -156,8 +171,16 @@ export const getAniListInfo: RequestHandler = async (req, res) => {
       if (seen.has(cur.id)) break;
       seen.add(cur.id);
       back.push(cur);
-      const nextEdges = Array.isArray(cur?.relations?.edges) ? cur.relations.edges : [];
-      const prev = pickTv(nextEdges.filter((e: any) => (e?.relationType || "").toUpperCase() === "PREQUEL").map((e: any) => e.node));
+      const nextEdges = Array.isArray(cur?.relations?.edges)
+        ? cur.relations.edges
+        : [];
+      const prev = pickTv(
+        nextEdges
+          .filter(
+            (e: any) => (e?.relationType || "").toUpperCase() === "PREQUEL",
+          )
+          .map((e: any) => e.node),
+      );
       cur = prev ? idToNode[prev.id] || prev : null;
     }
 
@@ -166,8 +189,16 @@ export const getAniListInfo: RequestHandler = async (req, res) => {
       if (seen.has(cur.id)) break;
       seen.add(cur.id);
       fwd.push(cur);
-      const nextEdges = Array.isArray(cur?.relations?.edges) ? cur.relations.edges : [];
-      const nxt = pickTv(nextEdges.filter((e: any) => (e?.relationType || "").toUpperCase() === "SEQUEL").map((e: any) => e.node));
+      const nextEdges = Array.isArray(cur?.relations?.edges)
+        ? cur.relations.edges
+        : [];
+      const nxt = pickTv(
+        nextEdges
+          .filter(
+            (e: any) => (e?.relationType || "").toUpperCase() === "SEQUEL",
+          )
+          .map((e: any) => e.node),
+      );
       cur = nxt ? idToNode[nxt.id] || nxt : null;
     }
 
@@ -223,9 +254,13 @@ export const getAniListEpisodes: RequestHandler = async (req, res) => {
       .sort((a, b) => a.number - b.number);
 
     // Include streaming episodes if present (they may have titles)
-    const streams: any[] = Array.isArray(m?.streamingEpisodes) ? m.streamingEpisodes : [];
+    const streams: any[] = Array.isArray(m?.streamingEpisodes)
+      ? m.streamingEpisodes
+      : [];
     for (const s of streams) {
-      const match = episodes.find((e) => e.number === (Number((s.title || "").match(/\d+/)?.[0]) || -1));
+      const match = episodes.find(
+        (e) => e.number === (Number((s.title || "").match(/\d+/)?.[0]) || -1),
+      );
       if (match && s.title) match.title = s.title;
     }
 
@@ -233,7 +268,11 @@ export const getAniListEpisodes: RequestHandler = async (req, res) => {
     res.json({
       episodes,
       pagination: pi
-        ? { page: pi.currentPage, has_next_page: !!pi.hasNextPage, last_visible_page: pi.lastPage ?? null }
+        ? {
+            page: pi.currentPage,
+            has_next_page: !!pi.hasNextPage,
+            last_visible_page: pi.lastPage ?? null,
+          }
         : null,
     });
   } catch (e: any) {

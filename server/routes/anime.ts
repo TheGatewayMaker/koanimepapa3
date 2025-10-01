@@ -98,14 +98,13 @@ export const getSearch: RequestHandler = async (req, res) => {
 
     // Basic fuzzy scoring against multiple title variants
     const norm = (s: string) => s.toLowerCase();
-    const tokens = norm(q)
-      .split(/\s+/)
-      .filter(Boolean);
+    const tokens = norm(q).split(/\s+/).filter(Boolean);
     function score(item: any): number {
       const titles: string[] = [];
       if (item?.title) titles.push(item.title);
       if (item?.title_english) titles.push(item.title_english);
-      if (Array.isArray(item?.titles)) titles.push(...item.titles.map((t: any) => t?.title).filter(Boolean));
+      if (Array.isArray(item?.titles))
+        titles.push(...item.titles.map((t: any) => t?.title).filter(Boolean));
       const hay = norm(titles.join(" | "));
       let s = 0;
       for (const t of tokens) {
@@ -114,8 +113,10 @@ export const getSearch: RequestHandler = async (req, res) => {
         if (hay.startsWith(t)) s += 2; // prefix
       }
       // Boost by popularity proxies if available
-      if (typeof item?.members === "number") s += Math.min(10, Math.floor(item.members / 100000));
-      if (typeof item?.favorites === "number") s += Math.min(10, Math.floor(item.favorites / 10000));
+      if (typeof item?.members === "number")
+        s += Math.min(10, Math.floor(item.members / 100000));
+      if (typeof item?.favorites === "number")
+        s += Math.min(10, Math.floor(item.favorites / 10000));
       return s;
     }
 
